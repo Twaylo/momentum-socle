@@ -1,4 +1,3 @@
-import { descripteurDe } from '../../noyau/oauth-reseaux.js'
 import { doitRafraichir } from '../../noyau/oauth.js'
 import { ouvrir, rafraichir, revoquer, terminer } from '../oauth/flux.js'
 import { identiteDe } from '../oauth/identite.js'
@@ -71,15 +70,7 @@ export const oauthConnecteur = {
          */
         backend: 'direct',
         jeton: fin.jetons.acces,
-        /**
-         * ⚠ Meta ne délivre pas de jeton de rafraîchissement : c'est le jeton
-         * d'ACCÈS qui se ré-échange contre lui-même. On le range donc en repli,
-         * sinon le renouvellement n'aurait rien sur quoi repartir et tous les
-         * comptes Instagram tomberaient au bout d'une heure.
-         */
-        refresh:
-          fin.jetons.refresh ??
-          (descripteurDe(fin.reseau)?.echangeLongueDuree ? fin.jetons.acces : null),
+        refresh: fin.jetons.refresh,
         expireLe: fin.jetons.expireLe,
       },
       espaceId: fin.espaceId,
@@ -143,14 +134,7 @@ export async function jetonFrais(compte, maintenantIso, deps = {}) {
     return { acces: compte.jeton, refresh: compte.refresh, expireLe: compte.expireLe, renouvele: false }
   }
 
-  /**
-   * ⚠ Meta se rallonge à partir du jeton d'ACCÈS, les autres à partir du jeton
-   * de rafraîchissement. Le flux le sait ; ici on lui donne simplement ce qu'il
-   * a de disponible.
-   */
-  const base = descripteurDe(compte.reseau)?.echangeLongueDuree
-    ? (compte.refresh ?? compte.jeton)
-    : compte.refresh
+  const base = compte.refresh
 
   /**
    * ⚠ UN RENOUVELLEMENT QUI ÉCHOUE EST UN ÉTAT, PAS UNE EXCEPTION.

@@ -223,15 +223,6 @@ export async function rafraichir({ reseau, refresh }, maintenantIso, deps = {}) 
   const descripteur = descripteurDe(reseau)
   if (!descripteur) return null
 
-  /**
-   * ⚠ META N'A PAS DE RAFRAÎCHISSEMENT AU SENS OAUTH.
-   *
-   * Son jeton « longue durée » se ré-échange contre lui-même. Lui envoyer un
-   * `grant_type=refresh_token` donne une erreur qui parle d'un paramètre
-   * inconnu, et on chercherait longtemps du mauvais côté.
-   */
-  if (descripteur.echangeLongueDuree) return rallongerMeta({ reseau, refresh }, maintenantIso, deps)
-
   const { clientId, clientSecret } = exigerIdentifiants(reseau)
   const brut = await demanderJetons(
     reseau,
@@ -243,42 +234,6 @@ export async function rafraichir({ reseau, refresh }, maintenantIso, deps = {}) 
   // ⚠ L'ancien refresh est passé en repli : Google ne le renvoie qu'à la
   // première autorisation, et l'écraser déconnecterait le créateur en silence.
   return rangerJetons(brut, maintenantIso, refresh)
-}
-
-/**
- * Meta : rallonge un jeton en l'échangeant contre lui-même.
- *
- * Le jeton court dure une heure, le long soixante jours. On repart du jeton
- * courant — c'est pour ça que `refresh` porte ici le jeton d'ACCÈS et non un
- * jeton de rafraîchissement : Meta n'en délivre pas.
- */
-async function rallongerMeta({ reseau, refresh }, maintenantIso, deps = {}) {
-  const descripteur = descripteurDe(reseau)
-  const { clientId, clientSecret } = exigerIdentifiants(reseau)
-
-  const params = new URLSearchParams({
-    grant_type: descripteur.echangeLongueDuree.grant,
-    client_id: clientId,
-    client_secret: clientSecret,
-    fb_exchange_token: refresh,
-  })
-
-  const appel = deps.appel ?? fetch
-  const reponse = await appel(`${descripteur.echangeLongueDuree.adresse}?${params}`, {
-    method: 'GET',
-    signal: AbortSignal.timeout(DELAI_MS),
-  })
-  const brut = await lireCorps(reponse)
-
-  if (!reponse.ok || brut.error) {
-    console.warn(`[oauth] ${reseau} — rallonge refusée ${brut.error?.type ?? reponse.status}`)
-    return null
-  }
-
-  // Le jeton rallongé sert AUSSI de base au prochain échange : on le range dans
-  // les deux champs, sinon le renouvellement suivant repartirait de l'ancien.
-  const jetons = rangerJetons(brut, maintenantIso)
-  return jetons ? { ...jetons, refresh: jetons.acces } : null
 }
 
 /**

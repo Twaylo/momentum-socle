@@ -69,12 +69,12 @@ export function nouveauCouplePkce() {
 }
 
 /** Range une autorisation en cours. Rend l'état à mettre dans l'adresse. */
-export async function deposer({ etat, espaceId, reseau, verifieur, redirection, retour }, maintenantIso) {
+export async function deposer({ etat, reseau, verifieur, redirection }, maintenantIso) {
   const expire = new Date(Date.parse(maintenantIso) + DUREE_ATTENTE_MS).toISOString()
   await executer(
-    `INSERT INTO oauth_attente (etat, espace_id, reseau, verifieur_chiffre, redirection, retour, cree_le, expire_le)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [etat, espaceId, reseau, chiffrer(verifieur ?? null), redirection, retour ?? null, maintenantIso, expire],
+    `INSERT INTO oauth_attente (etat, reseau, verifieur_chiffre, redirection, cree_le, perime_le)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [etat, reseau, chiffrer(verifieur ?? null), redirection, maintenantIso, expire],
   )
   return etat
 }
@@ -90,13 +90,13 @@ export async function deposer({ etat, espaceId, reseau, verifieur, redirection, 
  *
  * @returns {Promise<{ok: true, ...}|{ok: false, raison: string}>}
  */
-export async function consommer({ etat, espaceId }, maintenantIso) {
+export async function consommer({ etat }, maintenantIso) {
   if (!etat) return { ok: false, raison: 'etat_absent' }
 
-  const ligne = await un('SELECT * FROM oauth_attente WHERE etat = ?', [etat])
+  const ligne = await un('SELECT * FROM oauth_attente WHERE etat = $1', [etat])
   if (!ligne) return { ok: false, raison: 'etat_inconnu' }
 
-  await executer('DELETE FROM oauth_attente WHERE etat = ?', [etat])
+  await executer('DELETE FROM oauth_attente WHERE etat = $1', [etat])
 
   /**
    * ⚠ La comparaison passe par `etatValide` (temps constant) alors qu'on vient
@@ -106,26 +106,15 @@ export async function consommer({ etat, espaceId }, maintenantIso) {
    */
   if (!etatValide(ligne.etat, etat)) return { ok: false, raison: 'etat_invalide' }
 
-  /**
-   * ⚠ L'ESPACE DOIT CORRESPONDRE.
-   *
-   * Sans ce contrôle, un état volé à un créateur pourrait être terminé depuis la
-   * session d'un AUTRE — qui récupérerait alors le compte connecté. C'est
-   * exactement l'attaque que l'état sert à empêcher, retournée d'un cran.
-   */
-  if (espaceId && ligne.espace_id !== espaceId) return { ok: false, raison: 'espace_different' }
-
-  if (Date.parse(ligne.expire_le) <= Date.parse(maintenantIso)) {
+  if (Date.parse(ligne.perime_le) <= Date.parse(maintenantIso)) {
     return { ok: false, raison: 'expire' }
   }
 
   return {
     ok: true,
-    espaceId: ligne.espace_id,
     reseau: ligne.reseau,
     verifieur: dechiffrer(ligne.verifieur_chiffre),
     redirection: ligne.redirection,
-    retour: ligne.retour,
   }
 }
 
@@ -137,7 +126,7 @@ export async function consommer({ etat, espaceId }, maintenantIso) {
  * secrets, même courts.
  */
 export async function purgerLesAttentes(maintenantIso) {
-  const avant = await un('SELECT COUNT(*) AS n FROM oauth_attente WHERE expire_le <= ?', [maintenantIso])
-  await executer('DELETE FROM oauth_attente WHERE expire_le <= ?', [maintenantIso])
+  const avant = await un('SELECT COUNT(*) AS n FROM oauth_attente WHERE perime_le <= $1', [maintenantIso])
+  await executer('DELETE FROM oauth_attente WHERE perime_le <= $1', [maintenantIso])
   return Number(avant?.n ?? 0)
 }
