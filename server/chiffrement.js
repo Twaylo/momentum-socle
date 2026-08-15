@@ -1,5 +1,3 @@
-import fs from 'node:fs'
-import path from 'node:path'
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
 
 /**
@@ -18,48 +16,46 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
  * enverrait ensuite à une plateforme.
  */
 
-const DOSSIER = () => process.env.DONNEES_DIR ?? '.donnees'
-const FICHIER_CLE = () => path.join(DOSSIER(), '.cle-chiffrement')
-
 let cleEnCache = null
 
+/**
+ * ⚠ LA CLÉ VIENT DE L'ENVIRONNEMENT, ET DE NULLE PART AILLEURS.
+ *
+ * ── UN REPLI RETIRÉ, ET POURQUOI ─────────────────────────────────────────────
+ *
+ * La version d'origine de ce fichier avait un repli : hors production, elle
+ * générait une clé et l'écrivait dans `.donnees/.cle-chiffrement`. Le garde-fou
+ * ne se déclenchait donc que si `NODE_ENV` valait exactement `production`.
+ *
+ * Ce repli a été retiré ici, parce qu'il transforme une variable oubliée en
+ * panne silencieuse. Sur un hébergeur dont le disque est effacé à chaque
+ * redéploiement, une clé écrite sur ce disque disparaît à la mise en ligne
+ * suivante : les jetons rangés deviennent illisibles, et il faut reconnecter
+ * YouTube — sans qu'aucune erreur ne dise pourquoi. Il aurait suffi d'oublier
+ * `NODE_ENV=production` pour l'obtenir.
+ *
+ * Le défaut a été trouvé en LANÇANT le serveur sans la variable, pas en relisant
+ * le code : le garde-fou du démarrage ne s'était pas déclenché.
+ *
+ * Une variable manquante doit arrêter le serveur, jamais fabriquer un secret
+ * jetable à sa place.
+ */
 function chargerCle() {
   if (cleEnCache) return cleEnCache
 
   const depuisEnv = process.env.CLE_CHIFFREMENT
-  if (depuisEnv) {
-    if (!/^[0-9a-f]{64}$/i.test(depuisEnv)) {
-      throw new Error('CLE_CHIFFREMENT doit faire 64 caractères hexadécimaux (32 octets).')
-    }
-    cleEnCache = Buffer.from(depuisEnv, 'hex')
-    return cleEnCache
-  }
-
-  // En production, une clé générée à la volée serait perdue au redéploiement —
-  // et TOUS les créateurs devraient reconnecter leurs réseaux. On refuse de
-  // démarrer plutôt que de préparer cette panne.
-  if (process.env.NODE_ENV === 'production') {
+  if (!depuisEnv) {
     throw new Error(
       'CLE_CHIFFREMENT est absente. Sans clé STABLE, les jetons deviennent illisibles ' +
-        'au prochain déploiement et tous les créateurs devront reconnecter leurs réseaux.',
+        'au prochain déploiement et il faut tout reconnecter.',
     )
   }
-
-  try {
-    const stockee = fs.readFileSync(FICHIER_CLE(), 'utf8').trim()
-    if (/^[0-9a-f]{64}$/i.test(stockee)) {
-      cleEnCache = Buffer.from(stockee, 'hex')
-      return cleEnCache
-    }
-  } catch {
-    /* pas encore de clé : on en crée une pour le développement local */
+  if (!/^[0-9a-f]{64}$/i.test(depuisEnv)) {
+    throw new Error('CLE_CHIFFREMENT doit faire 64 caractères hexadécimaux (32 octets).')
   }
 
-  const cle = randomBytes(32)
-  fs.mkdirSync(DOSSIER(), { recursive: true })
-  fs.writeFileSync(FICHIER_CLE(), cle.toString('hex'), { mode: 0o600 })
-  cleEnCache = cle
-  return cle
+  cleEnCache = Buffer.from(depuisEnv, 'hex')
+  return cleEnCache
 }
 
 /** Vide le cache de clé. Utilisé par les tests. */
