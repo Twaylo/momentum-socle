@@ -74,7 +74,8 @@ Pièges de plateforme déjà rencontrés, à traiter comme acquis :
 
 ## Stack et commandes
 
-- Framework : Next.js — Hébergement : Render
+- Framework : **Vite** (interface React) + un **serveur Node/Express séparé**,
+  base reprise de l'ancien dépôt. Pas de Next.js. — Hébergement : Render
 - Base de données : **PostgreSQL dès maintenant**, jamais SQLite. Sur Render le
   disque est effacé à chaque redéploiement : des jetons stockés en local
   seraient perdus, et il faudrait reconnecter les réseaux à chaque mise en
@@ -82,14 +83,13 @@ Pièges de plateforme déjà rencontrés, à traiter comme acquis :
 - `CLE_CHIFFREMENT` : générée une seule fois, conservée dans le gestionnaire de
   mots de passe du fondateur, **identique partout** — local et production. Une
   clé qui change oblige à tout reconnecter.
-- Gestionnaire de paquets : `[À REMPLIR]` — celui de l'ancien dépôt, à relever
-  à sa réception.
+- Gestionnaire de paquets : **npm** (Node ≥ 22.11).
 
 ```
-[À REMPLIR] dev      # lancer en local
-[À REMPLIR] test     # lancer les tests
-[À REMPLIR] lint
-[À REMPLIR] build
+npm run dev      # lancer en local (interface + serveur ensemble)
+npm test         # lancer les tests
+npm run lint
+npm run build
 ```
 
 ## Architecture
