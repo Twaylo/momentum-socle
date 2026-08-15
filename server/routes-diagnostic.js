@@ -12,7 +12,9 @@ import { exigerVerrou } from './verrou.js'
 
 export const routesDiagnostic = Router()
 
-routesDiagnostic.use(exigerVerrou)
+// ⚠ Sur le chemin, pas sur le routeur entier : sans chemin, il bloquerait aussi
+// la page d'accueil, et l'écran du mot de passe deviendrait inatteignable.
+routesDiagnostic.use('/api/diagnostic', exigerVerrou)
 
 routesDiagnostic.get('/api/diagnostic/youtube', async (req, res, suite) => {
   try {

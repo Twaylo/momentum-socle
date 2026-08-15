@@ -16,7 +16,8 @@
  */
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 
-import { enProduction, motDePasse } from './config.js'
+import { motDePasse } from './config.js'
+import { urlPublique } from './url-publique.js'
 
 export const NOM_COOKIE = 'mm_verrou'
 
@@ -103,12 +104,20 @@ export function motDePasseJuste(fourni) {
   return egalEnTempsConstant(fourni, attendu)
 }
 
-/** Les options du cookie. `Secure` seulement en production, sinon il ne part pas en local. */
+/**
+ * Les options du cookie.
+ *
+ * ⚠ `Secure` SUIT L'ADRESSE RÉELLE, PAS `NODE_ENV`. Un serveur servi en https
+ * dont la variable d'environnement n'aurait pas été posée émettrait un cookie
+ * sans `Secure` — il partirait alors aussi en clair. Et en local, où l'adresse
+ * est en http, le forcer empêcherait le cookie de revenir : on ne pourrait plus
+ * entrer du tout.
+ */
 export function optionsCookie() {
   return {
     httpOnly: true,
     sameSite: 'lax',
-    secure: enProduction,
+    secure: urlPublique().startsWith('https://'),
     maxAge: DUREE_MS,
     path: '/',
   }

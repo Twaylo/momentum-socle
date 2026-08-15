@@ -20,7 +20,17 @@ export const routesConnexions = Router()
 /** Où l'on renvoie le fondateur après un aller-retour, réussi ou non. */
 const ECRAN = '/reglages'
 
-routesConnexions.use(exigerVerrou)
+/**
+ * ⚠ LE VERROU EST POSÉ SUR UN CHEMIN, PAS SUR TOUT LE ROUTEUR.
+ *
+ * Écrit `routesConnexions.use(exigerVerrou)`, sans chemin, il s'applique à
+ * CHAQUE requête qui traverse ce routeur — y compris `/`. Le serveur rendait
+ * alors 401 sur la page d'accueil : impossible d'afficher l'écran qui demande
+ * le mot de passe, donc impossible d'entrer. Un verrou sans porte.
+ *
+ * Trouvé en interrogeant le serveur pour de vrai, pas en relisant le fichier.
+ */
+routesConnexions.use('/api/connexions', exigerVerrou)
 
 /**
  * L'état de chaque réseau : connecté ou non, expiration, dernière erreur.

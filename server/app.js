@@ -5,6 +5,7 @@
  * migrations et écoute — trois choses qui exigent une vraie base. En gardant le
  * montage ici, les routes se testent sans base, sans port, sans migration.
  */
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -14,7 +15,6 @@ import express from 'express'
 import { routesConnexions } from './routes-connexions.js'
 import { routesDiagnostic } from './routes-diagnostic.js'
 import { routesVerrou } from './routes-verrou.js'
-import { enProduction } from './config.js'
 
 const RACINE = fileURLToPath(new URL('..', import.meta.url))
 
@@ -31,9 +31,23 @@ export function construireApp() {
   app.use(routesConnexions)
   app.use(routesDiagnostic)
 
-  // En production, le serveur sert aussi l'interface construite par Vite.
-  if (enProduction) {
-    const dist = path.join(RACINE, 'dist')
+  /**
+   * Le serveur sert aussi l'interface construite par Vite — dès qu'elle existe.
+   *
+   * ⚠ LA CONDITION EST « LE DOSSIER EST LÀ », PAS « NODE_ENV VAUT PRODUCTION ».
+   *
+   * La version précédente de cette ligne testait `NODE_ENV`. Un hébergeur qui ne
+   * pose pas cette variable aurait alors servi une page blanche : le serveur
+   * répond, les routes marchent, et l'écran ne s'affiche pas — sans la moindre
+   * erreur pour dire pourquoi. C'est la même faute que la clé de chiffrement
+   * générée en douce, sous un autre nom : faire dépendre un comportement d'une
+   * variable qu'on peut oublier.
+   *
+   * En développement, `dist` n'existe pas et Vite sert l'interface sur son
+   * propre port : la condition tombe d'elle-même, sans variable.
+   */
+  const dist = path.join(RACINE, 'dist')
+  if (existsSync(path.join(dist, 'index.html'))) {
     app.use(express.static(dist))
     app.get(/^\/(?!api\/).*/, (req, res) => res.sendFile(path.join(dist, 'index.html')))
   }
