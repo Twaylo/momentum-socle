@@ -88,6 +88,10 @@ d'expiration, et il n'existe **aucun équivalent Google** dans l'ancien dépôt.
 Ce qu'il faut en retenir, ce n'est donc pas du code, c'est une idée : distinguer
 *accordé* / *refusé* / *jamais demandé* — trois états, jamais deux.
 
+**Décision du fondateur : aucune sonde n'est copiée.** Elles sont Meta
+uniquement, tronquées à 300 caractères, sans test — non réutilisables telles
+quelles. Le chantier 1 en écrit une neuve pour Google.
+
 Une pièce reste bonne : `noyau/diagnostic.js` (195 lignes), pur, sans réseau ni
 base. Bon modèle de « des faits entrent, un verdict sort ». Son contenu actuel
 parle de l'agrégateur et ne sert pas tel quel.
@@ -131,7 +135,10 @@ dans `docs/dossiers-plateformes.md`, qui n'a pas été ouvert.
 
 ---
 
-## 7. Ce qu'on propose de reprendre — non validé
+## 7. Ce qu'on reprend — validé par le fondateur
+
+On reprend **le chemin OAuth** et **le test des jetons de style**. On laisse
+l'aiguilleur des connecteurs et les routes. Aucune sonde n'est copiée.
 
 Ordre de grandeur : **environ 1 100 lignes**, réparties en 9 à 10 fichiers, tous
 sous 300 lignes. Environ 700 lignes se recopient presque telles quelles.
@@ -166,6 +173,11 @@ Presque tel quel :
 `server/agregateur/`, `noyau/youtube.js` (c'est de la publication, pas de la
 connexion), et les quatre sondes Meta.
 
+**À écrire de neuf : une sonde Google.** Aucune sonde de l'ancien dépôt ne sert
+(voir §4). Le chantier 1 en demande une, et elle doit tenir la règle que les
+anciennes ne tenaient pas : montrer la **réponse brute** de la plateforme, pas un
+résumé, et envoyer **exactement les mêmes paramètres que le moteur**.
+
 ---
 
 ## 8. Pièges déjà payés, à ne pas redécouvrir
@@ -185,24 +197,97 @@ connexion), et les quatre sondes Meta.
 
 ---
 
-## 9. Ce qui reste à décider
+## 9. État des dossiers de validation, par plateforme
 
-1. **Les identifiants Google.** Les applications développeur existent (Google en
-   mode test, Meta pour Facebook/Instagram). Reste à savoir si
-   `GOOGLE_CLIENT_ID` et `GOOGLE_CLIENT_SECRET` sont en main.
-2. **L'adresse publique du service Render.** Existe-t-elle déjà ? Elle est
-   nécessaire pour déclarer l'adresse de retour OAuth chez Google.
-3. **Le mode « test » de Google fait expirer le jeton de rafraîchissement au
-   bout de 7 jours.** À vérifier sur le vrai compte, pas à supposer. Passer
-   l'application en production supprime la limite ; c'est une décision du
-   fondateur.
+Source : `docs/dossiers-plateformes.md` (284 lignes, daté du 13 août 2026) et
+`docs/decisions.md` (694 lignes). Rien d'autre n'a été lu sur ce sujet.
+
+**Aucun dossier n'est déposé.** Les deux documents sont écrits au futur : chaque
+section s'intitule « ce qu'il faut faire » et se termine par « ce qu'il me faut
+de toi ». Aucune date de dépôt, aucun accusé de réception, aucun refus.
+`decisions.md` conclut : « Le code attend ; c'est l'unique chose qu'il ne peut
+pas faire à notre place. »
+
+**Un écart à lever.** Le fondateur a indiqué que les applications développeur
+existent (Google en mode test, Meta pour Facebook et Instagram). Les documents,
+eux, les décrivent comme restant à créer. Ils datent du 13 août, soit deux jours
+avant cette session : elles ont pu être créées depuis. Ce sont les consoles qui
+tranchent, pas ces documents. Preuve pratique : si un `GOOGLE_CLIENT_ID` est en
+main, l'application existe.
+
+| Plateforme | Dossier | Délai annoncé | Verrou principal |
+|---|---|---|---|
+| YouTube | à déposer | 4 à 6 semaines | portées sensibles : vidéo de démonstration + politique de confidentialité en ligne |
+| TikTok | à déposer | 2 à 4 semaines | audit Content Posting API |
+| Meta (FB + IG) | à déposer, **un seul pour les deux** | 2 à 6 semaines | App Review |
+| X | **pas de dossier** | immédiat | un abonnement à ~100 $/mois, à décider |
+| LinkedIn | à déposer | long et variable | programme partenaire + Page d'entreprise obligatoire |
+| Bluesky | aucun | — | rien, publie déjà en direct |
+
+Ordre de dépôt prévu : YouTube d'abord (« le plus long, et le seul qui rend des
+chiffres réels dès l'autorisation obtenue »), TikTok en parallèle, puis Meta, X,
+LinkedIn.
+
+**Ce que ça change pour le chantier 1 : rien ne bloque.** Tant que l'écran de
+consentement Google n'est pas publié, « seuls 100 comptes de test peuvent
+autoriser Momentum » — largement assez pour un seul utilisateur, à condition que
+le compte du fondateur figure dans la liste des testeurs. Le dossier sert à
+ouvrir à d'autres, pas à se connecter soi-même. Quota par défaut : 10 000 unités
+par jour, une lecture de chaîne coûte 1 unité, un envoi de vidéo 1 600 — soit
+environ six publications par jour, ce qui concernera le chantier 2.
+
+**Le point le plus coûteux, à décider avant tout dépôt : le domaine de
+production.** Il n'est arrêté nulle part. Chaque adresse de retour OAuth y est
+déclarée, et « les plateformes la comparent caractère par caractère. Changer de
+domaine après dépôt oblige à repasser dans chaque console. » Le document ajoute :
+« il vaut mieux le décider avant de déposer le premier dossier qu'après le
+quatrième ».
+
+**Durées de vie des jetons, telles que documentées :**
+
+- **Google : un rafraîchissement ne rend pas toujours un nouveau jeton de
+  rafraîchissement.** Google ne le renvoie qu'à la première autorisation.
+  Écraser l'ancien déconnecterait silencieusement. Le code repris gère déjà ce
+  cas.
+- **Sans date d'expiration connue, on ne rafraîchit pas.** Le faire à chaque
+  appel brûlerait le quota et finirait par faire révoquer l'application.
+- Meta ne délivre pas de jeton de rafraîchissement : jeton d'une heure, échangé
+  contre un jeton de 60 jours à ré-échanger avant l'échéance. Seule exception au
+  flux commun.
+- X : sans la portée `offline.access`, l'accès meurt en deux heures.
+- **La limite des 7 jours du mode test de Google n'est mentionnée dans aucun des
+  deux documents** — seule la limite de 100 comptes l'est. Elle reste à vérifier
+  sur le vrai compte, pas à supposer.
+
+**Deux points où le nouveau dépôt s'écarte volontairement de l'ancien :**
+`DEC-012` prévoyait SQLite en local et PostgreSQL en production — on prend
+PostgreSQL partout. Et aucun des deux documents ne nomme d'hébergeur : Render est
+une décision de cette phase, pas un héritage.
+
+---
+
+## 10. Ce qui reste à décider
+
+1. **Les identifiants Google.** `GOOGLE_CLIENT_ID` et `GOOGLE_CLIENT_SECRET`
+   sont-ils en main ? C'est la dernière chose qui empêche le chantier 1 de
+   démarrer.
+2. **Le domaine de production.** Non arrêté, et c'est le point le plus coûteux à
+   rattraper : chaque adresse de retour OAuth y est déclarée, caractère par
+   caractère, dans chaque console. À décider avant le premier dépôt de dossier,
+   pas après. Pour le chantier 1, l'adresse du service Render suffit — encore
+   faut-il savoir si ce service existe.
+3. **Le mode test de Google.** Sa limite documentée est de 100 comptes de test,
+   ce qui suffit à un utilisateur unique. La limite de 7 jours sur le jeton de
+   rafraîchissement n'est écrite nulle part : à constater sur le vrai compte,
+   pas à supposer.
 4. **Le verrou d'accès.** L'ancien dépôt a un vrai système de comptes (mots de
    passe hachés, cookie de session, espaces séparés) — beaucoup plus lourd que
    le mot de passe unique voulu. À trancher : reprendre et simplifier, ou écrire
    le verrou minimal directement.
-5. **Corriger `CLAUDE.md` sur les sondes** : il en annonce trois, il y en a
-   quatre, et aucune ne sert au chantier 1. La phrase « à copier plutôt qu'à
-   réécrire » ne s'applique pas aux sondes pour ce chantier.
-6. **Ouvrir ou non `docs/dossiers-plateformes.md`**, seul endroit probable où se
-   trouve l'état des dossiers de validation chez Google, Meta et TikTok.
-7. **Rien n'est recopié à ce jour.** La liste du point 7 attend validation.
+5. **L'abonnement X (~100 $/mois)** et l'offre multi-comptes de l'agrégateur :
+   deux engagements d'argent qu'aucune décision de l'ancien dépôt ne tranche.
+   Hors périmètre de cette phase, notés pour mémoire.
+
+Réglé pendant cette session : la liste du §7 est validée, aucune sonde n'est
+copiée, `CLAUDE.md` est corrigé sur les quatre sondes, et les documents de
+dossiers ont été lus (§9). **Rien n'est encore recopié dans le dépôt.**

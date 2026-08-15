@@ -55,8 +55,13 @@ tâche semble en avoir besoin, **arrête-toi et demande**.
 Reprise de la version précédente. À copier plutôt qu'à réécrire :
 
 - le code des providers (particularités de chaque API plateforme)
-- les trois sondes de diagnostic (jeton, Pages, historique)
 - le test qui vérifie que tout `var(--x)` correspond à un jeton déclaré
+
+Les sondes de diagnostic de l'ancien dépôt — **quatre et non trois** (jeton,
+Pages, vues, historique) — **ne se copient pas** : elles sont toutes Meta, elles
+tronquent leur sortie à 300 caractères au lieu de montrer la réponse brute, et
+aucun test ne les couvre. Ce qu'on en reprend est une idée, pas du code :
+**accordé / refusé / jamais demandé** — trois états, jamais deux.
 
 Pièges de plateforme déjà rencontrés, à traiter comme acquis :
 
