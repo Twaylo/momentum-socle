@@ -1,0 +1,37 @@
+node_modules
+dist
+dist-ssr
+*.local
+.DS_Store
+
+# Secrets — EXG-TEC-041 : aucun secret dans le dépôt.
+.env
+.env.*
+!.env.example
+
+# Données locales : base SQLite, médias déposés, fichiers de travail.
+#
+# ⚠ Les deux orthographes. Le serveur de médias écrivait dans « donnees » sans
+# point pendant que la base écrivait dans « .donnees » : vingt-trois fichiers de
+# recette se sont retrouvés commités, et sur la machine du fondateur ç’auraient
+# été ses vidéos. Le défaut est corrigé ; la garde reste.
+.donnees
+donnees
+
+# Artefacts de compilation — EXG-TEC-082 : jamais versionnés.
+*.tsbuildinfo
+
+# Tests de bout en bout
+playwright-report
+test-results
+.tsbuild
+
+# Captures du banc d'essai (ch. 44) — artefacts, jamais versionnés.
+.captures
+
+# Base des tests de bout en bout
+.donnees-e2e
+
+# Aperçu : artefact de construction (EXG-TEC-082)
+.apercu
+apercu-momentum.html

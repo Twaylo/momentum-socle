@@ -80,15 +80,30 @@ Pièges de plateforme déjà rencontrés, à traiter comme acquis :
 ## Stack et commandes
 
 - Framework : **Vite** (interface React) + un **serveur Node/Express séparé**,
-  base reprise de l'ancien dépôt. Pas de Next.js. — Hébergement : Render
-- Base de données : **PostgreSQL dès maintenant**, jamais SQLite. Sur Render le
-  disque est effacé à chaque redéploiement : des jetons stockés en local
-  seraient perdus, et il faudrait reconnecter les réseaux à chaque mise en
+  base reprise de l'ancien dépôt. Pas de Next.js. — Hébergement : **Railway**
+- Base de données : **PostgreSQL dès maintenant**, jamais SQLite. Le disque d'un
+  hébergeur de ce type est effacé à chaque redéploiement : des jetons stockés en
+  local seraient perdus, et il faudrait reconnecter les réseaux à chaque mise en
   ligne.
-- `CLE_CHIFFREMENT` : générée une seule fois, conservée dans le gestionnaire de
-  mots de passe du fondateur, **identique partout** — local et production. Une
-  clé qui change oblige à tout reconnecter.
 - Gestionnaire de paquets : **npm** (Node ≥ 22.11).
+
+Variables d'environnement propres à cette phase. `.env.example` est un document
+hérité de la version précédente : il décrit un produit plus large et **n'est pas
+modifié**. Les variables réellement utilisées ici sont donc listées ci-dessous.
+
+- `CLE_CHIFFREMENT` : chiffre les jetons OAuth au repos, 32 octets en hexadécimal.
+  Générée une seule fois, conservée dans le gestionnaire de mots de passe du
+  fondateur, **identique partout** — local et production. Une clé qui change
+  oblige à tout reconnecter. Vérifiée au démarrage : sans elle, le serveur
+  refuse de démarrer plutôt que de casser au moment d'une connexion.
+- `MOT_DE_PASSE` : le verrou d'accès à l'entrée de l'application. Un seul mot de
+  passe, pas de compte, pas d'inscription — la variable **est** le mot de passe.
+  Absente, le serveur refuse de démarrer : une application déployée sans verrou
+  laisserait n'importe qui toucher aux comptes du fondateur.
+- `DATABASE_URL` : PostgreSQL. Fournie par l'hébergeur.
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` : l'application développeur Google.
+- `URL_PUBLIQUE` : à ne pas renseigner sur Railway, elle est déduite de
+  `RAILWAY_PUBLIC_DOMAIN`. C'est elle qui construit l'adresse de retour OAuth.
 
 ```
 npm run dev      # lancer en local (interface + serveur ensemble)
