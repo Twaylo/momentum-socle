@@ -5,11 +5,8 @@ import {
   adresseDAutorisation,
   corpsDEchange,
   corpsDeRafraichissement,
-  doitRafraichir,
   entetesDEchange,
   etatValide,
-  lireEchec,
-  rangerJetons,
 } from './oauth.js'
 import { DESCRIPTEURS } from './oauth-reseaux.js'
 
@@ -21,6 +18,16 @@ import { DESCRIPTEURS } from './oauth-reseaux.js'
  * tard, ou trois semaines plus tard, ou dans le compte de quelqu'un d'autre.
  *
  * Chaque test ci-dessous fige une faute précise, avec sa conséquence.
+ *
+ * ⚠ LES DESCRIPTEURS FACTICES NE SONT PAS DE LA PARESSE. Le dépôt ne porte plus
+ * qu'un seul réseau (YouTube) : les tests de MÉCANIQUE — renommage du client,
+ * PKCE, secret en en-tête — ne peuvent plus s'appuyer sur TikTok ou X. Ils
+ * gardent leur cobaye sous forme de descripteur factice, avec la conséquence
+ * réelle en commentaire. Le jour où ces réseaux reviennent, le chemin de code
+ * qu'ils empruntent est déjà couvert.
+ *
+ * Le rangement des jetons, le rafraîchissement et les descripteurs sont dans
+ * `oauth-jetons.test.js` — deux fichiers, parce qu'aucun ne dépasse 300 lignes.
  */
 
 const bidon = {
@@ -28,6 +35,15 @@ const bidon = {
   jeton: 'https://exemple.test/token',
   portees: ['lire', 'ecrire'],
 }
+
+/** Un réseau qui renomme `client_id` — c'est le cas de TikTok. */
+const renomme = { ...bidon, nomClient: 'client_key' }
+
+/** Un réseau qui exige PKCE — c'est le cas de TikTok et de X. */
+const avecPkce = { ...bidon, pkce: 'S256' }
+
+/** Un réseau qui veut son secret en en-tête — c'est le cas de X. */
+const secretEnEntete = { ...bidon, secretEnEntete: true }
 
 describe('⚠ l’adresse d’autorisation', () => {
   test('un état est OBLIGATOIRE, sans valeur par défaut', () => {
@@ -61,17 +77,17 @@ describe('⚠ l’adresse d’autorisation', () => {
     assert.equal(avecVirgules.searchParams.get('scope'), 'lire,ecrire')
   })
 
-  test('⚠ TikTok reçoit client_key, pas client_id', () => {
+  test('⚠ un réseau qui renomme client_id le reçoit sous SON nom', () => {
     /**
-     * Envoyer `client_id` à TikTok donne une erreur qui ne nomme pas le champ
-     * manquant. On a passé assez de soirées sur des messages qui ne disent rien.
+     * TikTok n'appelle pas ça `client_id` mais `client_key`. Envoyer `client_id`
+     * donne une erreur qui ne nomme pas le champ manquant. On a passé assez de
+     * soirées sur des messages qui ne disent rien.
      */
     const u = new URL(
-      adresseDAutorisation(DESCRIPTEURS.tiktok, {
+      adresseDAutorisation(renomme, {
         clientId: 'clef',
         redirection: 'https://m.test/retour',
         state: 'e1',
-        defi: 'd1',
       }),
     )
     assert.equal(u.searchParams.get('client_key'), 'clef')
@@ -85,12 +101,7 @@ describe('⚠ l’adresse d’autorisation', () => {
      * rattache à l'adresse construite ici. On échoue tout de suite.
      */
     assert.throws(
-      () =>
-        adresseDAutorisation(DESCRIPTEURS.tiktok, {
-          clientId: 'clef',
-          redirection: 'r',
-          state: 'e1',
-        }),
+      () => adresseDAutorisation(avecPkce, { clientId: 'clef', redirection: 'r', state: 'e1' }),
       /PKCE/,
     )
   })
@@ -179,27 +190,23 @@ describe('⚠ l’échange du code contre un jeton', () => {
      * X refuse la demande quand les deux sont présents, avec un 401 qui
      * n'explique rien. Un seul endroit, décidé par le descripteur.
      */
-    const c = corpsDEchange(DESCRIPTEURS.x, {
+    const c = corpsDEchange(secretEnEntete, {
       code: 'c1',
       clientId: 'abc',
       clientSecret: 's',
       redirection: 'r',
-      verifieur: 'v1',
     })
     assert.equal(c.get('client_secret'), null)
 
-    const entetes = entetesDEchange(DESCRIPTEURS.x, { clientId: 'abc', clientSecret: 's' })
+    const entetes = entetesDEchange(secretEnEntete, { clientId: 'abc', clientSecret: 's' })
     assert.equal(entetes.Authorization, `Basic ${btoa('abc:s')}`)
   })
 
   test('le vérifieur PKCE accompagne le code', () => {
-    const c = corpsDEchange(DESCRIPTEURS.tiktok, {
-      code: 'c1',
-      clientId: 'clef',
-      clientSecret: 's',
-      redirection: 'r',
-      verifieur: 'v1',
-    })
+    const c = corpsDEchange(
+      { ...avecPkce, nomClient: 'client_key' },
+      { code: 'c1', clientId: 'clef', clientSecret: 's', redirection: 'r', verifieur: 'v1' },
+    )
     assert.equal(c.get('code_verifier'), 'v1')
     assert.equal(c.get('client_key'), 'clef')
   })
@@ -210,7 +217,7 @@ describe('⚠ l’échange du code contre un jeton', () => {
   })
 
   test('le rafraîchissement garde le nom de client du réseau', () => {
-    const c = corpsDeRafraichissement(DESCRIPTEURS.tiktok, {
+    const c = corpsDeRafraichissement(renomme, {
       refresh: 'r1',
       clientId: 'clef',
       clientSecret: 's',
@@ -218,198 +225,5 @@ describe('⚠ l’échange du code contre un jeton', () => {
     assert.equal(c.get('grant_type'), 'refresh_token')
     assert.equal(c.get('refresh_token'), 'r1')
     assert.equal(c.get('client_key'), 'clef')
-  })
-})
-
-describe('⚠ le rangement des jetons', () => {
-  const t0 = '2026-08-13T10:00:00.000Z'
-
-  test('expires_in est une DURÉE : elle devient une date', () => {
-    /**
-     * La ranger telle quelle donnerait « expire en 1970 » : le jeton serait
-     * rafraîchi à chaque appel — ou jamais, selon le sens de la comparaison.
-     */
-    const j = rangerJetons({ access_token: 'a', expires_in: 3600 }, t0)
-    assert.equal(j.expireLe, '2026-08-13T11:00:00.000Z')
-  })
-
-  test('⚠ un rafraîchissement SANS nouveau refresh_token garde l’ancien', () => {
-    /**
-     * C'est LE piège de Google : il ne rend le jeton de rafraîchissement qu'à la
-     * première autorisation. Écraser l'ancien par `undefined` déconnecterait le
-     * créateur au premier rafraîchissement — silencieusement, et sans qu'il ait
-     * rien fait.
-     */
-    const j = rangerJetons({ access_token: 'a2', expires_in: 3600 }, t0, 'ancien-refresh')
-    assert.equal(j.refresh, 'ancien-refresh')
-  })
-
-  test('un nouveau refresh_token remplace bien l’ancien', () => {
-    const j = rangerJetons({ access_token: 'a2', refresh_token: 'neuf' }, t0, 'ancien')
-    assert.equal(j.refresh, 'neuf')
-  })
-
-  test('⚠ sans jeton d’accès, on rend null — pas un objet à moitié vide', () => {
-    // Un objet à moitié vide serait enregistré, et le compte s'afficherait
-    // « Connecté » alors qu'aucune publication ne peut partir.
-    assert.equal(rangerJetons({ error: 'invalid_grant' }, t0), null)
-    assert.equal(rangerJetons(null, t0), null)
-  })
-
-  test('sans expires_in, la date reste inconnue — pas inventée', () => {
-    const j = rangerJetons({ access_token: 'a' }, t0)
-    assert.equal(j.expireLe, null)
-  })
-
-  test('l’échéance du jeton de rafraîchissement est gardée quand elle existe', () => {
-    // TikTok : un an. Le savoir permet de prévenir AVANT la rupture.
-    const j = rangerJetons({ access_token: 'a', expires_in: 86_400, refresh_expires_in: 31_536_000 }, t0)
-    assert.equal(j.refreshExpireLe, '2027-08-13T10:00:00.000Z')
-  })
-
-  test('l’identifiant de compte arrive avec le jeton quand le réseau le donne', () => {
-    const j = rangerJetons({ access_token: 'a', open_id: 'tt-42' }, t0)
-    assert.equal(j.externeId, 'tt-42')
-  })
-})
-
-describe('⚠ quand rafraîchir', () => {
-  const t0 = '2026-08-13T10:00:00.000Z'
-
-  test('on rafraîchit AVANT l’échéance, pas à la seconde près', () => {
-    /**
-     * Sans marge, un appel parti juste avant l'échéance arrive juste après — et
-     * échoue pour une raison qu'aucun journal n'expliquera.
-     */
-    assert.equal(doitRafraichir('2026-08-13T10:02:00.000Z', t0), true)
-    assert.equal(doitRafraichir('2026-08-13T11:00:00.000Z', t0), false)
-  })
-
-  test('un jeton déjà expiré est à rafraîchir', () => {
-    assert.equal(doitRafraichir('2026-08-13T09:00:00.000Z', t0), true)
-  })
-
-  test('⚠ sans échéance connue, on NE rafraîchit PAS', () => {
-    /**
-     * Le faire à chaque appel brûlerait le quota du fournisseur et finirait par
-     * faire révoquer l'application — pour tous les créateurs à la fois.
-     */
-    assert.equal(doitRafraichir(null, t0), false)
-    assert.equal(doitRafraichir('n’importe quoi', t0), false)
-  })
-})
-
-describe('⚠ un refus du créateur n’est pas une panne', () => {
-  test('fermer la fenêtre ne produit pas d’erreur rouge', () => {
-    /**
-     * Rien n'est cassé, il n'y a rien à réparer. Afficher une erreur enverrait
-     * le créateur recommencer un geste qu'il vient volontairement d'annuler.
-     */
-    const r = lireEchec({ error: 'access_denied' })
-    assert.equal(r.refus, true)
-    assert.match(r.phrase, /pas confirmé/)
-  })
-
-  test('une configuration fausse, elle, est bien une panne', () => {
-    const r = lireEchec({ error: 'redirect_uri_mismatch' })
-    assert.equal(r.refus, false)
-    assert.equal(r.code, 'redirect_uri_mismatch')
-  })
-
-  test('⚠ la phrase rendue ne nomme aucune variable d’environnement (EXG-CNX-004)', () => {
-    for (const p of [{ error: 'access_denied' }, { error: 'invalid_client' }, {}]) {
-      assert.doesNotMatch(lireEchec(p).phrase, /[A-Z]{3,}_[A-Z_]+/)
-    }
-  })
-})
-
-describe('⚠ les descripteurs de réseaux', () => {
-  test('chacun a de quoi ouvrir ET de quoi échanger', () => {
-    for (const [id, d] of Object.entries(DESCRIPTEURS)) {
-      assert.ok(d.autorisation?.startsWith('https://'), id)
-      assert.ok(d.jeton?.startsWith('https://'), id)
-      assert.ok(d.portees?.length > 0, id)
-    }
-  })
-
-  test('⚠ chacun dit ce qu’il faut obtenir avant que ça marche', () => {
-    /**
-     * Un descripteur sans dossier laisserait croire qu'il suffit de brancher des
-     * identifiants. C'est faux pour cinq réseaux sur six, et c'est exactement le
-     * malentendu qui a coûté une soirée à ce produit.
-     */
-    for (const [id, d] of Object.entries(DESCRIPTEURS)) {
-      assert.ok(d.dossier && d.dossier.length > 20, id)
-    }
-  })
-
-  test('⚠ X demande offline.access, sans quoi il n’y a rien à rafraîchir', () => {
-    assert.ok(DESCRIPTEURS.x.portees.includes('offline.access'))
-  })
-
-  test('⚠ Meta ne demande AUCUN droit de publication tant qu’il ne publie pas', () => {
-    /**
-     * Meta refuse le consentement ENTIER dès qu'une seule portée n'est pas
-     * ouverte sur l'app — « Invalid Scopes », et le créateur ne voit rien
-     * d'autre qu'un écran gris. Une portée de publication demandée alors que
-     * rien ne l'appelle fait donc échouer la LECTURE, qui, elle, marcherait.
-     *
-     * ⚠ Ce test tombera le jour où un éditeur Meta direct existera. C'est
-     * voulu : il faudra alors remettre la portée ET le code qui s'en sert dans
-     * le même commit, pas l'une sans l'autre.
-     */
-    const publication = ['instagram_content_publish', 'pages_manage_posts']
-    for (const id of ['instagram', 'facebook']) {
-      for (const portee of publication) {
-        assert.ok(!DESCRIPTEURS[id].portees.includes(portee), `${id} demande ${portee}`)
-      }
-    }
-  })
-
-  test('⚠ Meta demande business_management, sinon les Pages deviennent invisibles', () => {
-    /**
-     * ⚠ CE TEST EXISTE PARCE QUE J'AI RETIRÉ CETTE PORTÉE.
-     *
-     * Au motif qu'aucune ligne ne l'appelle — ce qui est vrai. Elle ne sert pas
-     * à appeler un point d'entrée : elle sert à VOIR les Pages rangées dans un
-     * portefeuille professionnel. Meta y déplace une Page dès qu'on lui relie un
-     * compte Instagram.
-     *
-     * Sans elle, `me/accounts` rend une liste VIDE — sans erreur, sans refus,
-     * avec `pages_show_list` pourtant accordée. Indiscernable de « ce compte n'a
-     * aucune Page ». Le produit l'a affiché à quelqu'un qui en avait une.
-     */
-    for (const id of ['instagram', 'facebook']) {
-      assert.ok(DESCRIPTEURS[id].portees.includes('business_management'), id)
-    }
-  })
-
-  test('⚠ Meta demande quand même de quoi LIRE : les Pages et leurs chiffres', () => {
-    // `me/accounts` sans `pages_show_list` rend une liste vide — donc « aucune
-    // Page », donc un compte qui a l'air éteint alors qu'il ne l'est pas. C'est
-    // de là que vient le nombre d'abonnés des DEUX réseaux Meta.
-    for (const id of ['instagram', 'facebook']) {
-      assert.ok(DESCRIPTEURS[id].portees.includes('pages_show_list'), id)
-      assert.ok(DESCRIPTEURS[id].portees.includes('pages_read_engagement'), id)
-    }
-    assert.ok(DESCRIPTEURS.instagram.portees.includes('instagram_manage_insights'))
-    // Sans elle, la Page n'a que son compteur d'abonnés : ni portée, ni
-    // engagement. C'est la moitié de ce qu'un créateur vient chercher.
-    assert.ok(DESCRIPTEURS.facebook.portees.includes('read_insights'))
-  })
-
-  test('⚠ Meta n’a pas de rafraîchissement : il a un échange longue durée', () => {
-    /**
-     * Le traiter comme les autres déconnecterait tous les comptes Instagram au
-     * bout d'une heure.
-     */
-    assert.ok(DESCRIPTEURS.instagram.echangeLongueDuree)
-    assert.ok(DESCRIPTEURS.facebook.echangeLongueDuree)
-  })
-
-  test('⚠ aucun secret n’a été écrit dans le fichier', () => {
-    // EXG-TEC-041. Un descripteur ne contient que ce que la plateforme publie.
-    const texte = JSON.stringify(DESCRIPTEURS)
-    assert.doesNotMatch(texte, /secret["']?\s*:\s*["'][^"']{8,}/i)
   })
 })
