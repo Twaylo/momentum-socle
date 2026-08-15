@@ -1,0 +1,161 @@
+/**
+ * Les jetons de style.
+ *
+ * ⚠ Tout jeton employé ailleurs doit être déclaré ICI. Un jeton inconnu ne
+ * casse rien, ne rougit dans aucun outil : la propriété est simplement ignorée
+ * et l'élément hérite de la valeur courante. C'est comme ça que les chiffres se
+ * sont retrouvés à la taille de leurs libellés, avec une ligne qui a l'air
+ * correcte à la relecture. `jetons-utilises.test.js` vérifie la correspondance.
+ *
+ * ⚠ Ce test lit le fichier comme du TEXTE, commentaires compris : écrire un
+ * appel de jeton en exemple dans un commentaire le fait échouer. C'est arrivé
+ * en écrivant ce fichier-ci.
+ *
+ * Le soin du design est hors périmètre pour ce chantier : ce qui suit est
+ * lisible et sobre, pas fini.
+ */
+
+:root {
+  --fond: #16181d;
+  --fond-carte: #1e2128;
+  --bord: #2c313b;
+
+  --texte: #e9ecf1;
+  --texte-doux: #9aa3b2;
+
+  --accent: #6ea8fe;
+  --accent-texte: #0b1020;
+
+  --ok: #5ed39a;
+  --attention: #f0c674;
+  --rupture: #f2777a;
+
+  --t-titre: 1.5rem;
+  --t-sous-titre: 1.05rem;
+  --t-corps: 0.95rem;
+  --t-petit: 0.82rem;
+
+  --espace-1: 0.5rem;
+  --espace-2: 1rem;
+  --espace-3: 1.5rem;
+  --espace-4: 2.5rem;
+
+  --rayon: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--fond);
+  color: var(--texte);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: var(--t-corps);
+  line-height: 1.5;
+}
+
+.page {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: var(--espace-4) var(--espace-2);
+}
+
+h1 {
+  font-size: var(--t-titre);
+  margin: 0 0 var(--espace-3);
+}
+
+h2 {
+  font-size: var(--t-sous-titre);
+  margin: 0 0 var(--espace-1);
+}
+
+.doux {
+  color: var(--texte-doux);
+  font-size: var(--t-petit);
+}
+
+.carte {
+  background: var(--fond-carte);
+  border: 1px solid var(--bord);
+  border-radius: var(--rayon);
+  padding: var(--espace-3);
+  margin-bottom: var(--espace-2);
+}
+
+.ligne {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--espace-2);
+  padding: var(--espace-1) 0;
+}
+
+.pastille {
+  font-size: var(--t-petit);
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--bord);
+  white-space: nowrap;
+}
+
+.pastille-ok {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+.pastille-attention {
+  color: var(--attention);
+  border-color: var(--attention);
+}
+
+.pastille-rupture {
+  color: var(--rupture);
+  border-color: var(--rupture);
+}
+
+button,
+.bouton {
+  font: inherit;
+  background: var(--accent);
+  color: var(--accent-texte);
+  border: 0;
+  border-radius: var(--rayon);
+  padding: var(--espace-1) var(--espace-2);
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+
+button.discret {
+  background: transparent;
+  color: var(--texte-doux);
+  border: 1px solid var(--bord);
+}
+
+input {
+  font: inherit;
+  width: 100%;
+  padding: var(--espace-1) var(--espace-2);
+  background: var(--fond);
+  color: var(--texte);
+  border: 1px solid var(--bord);
+  border-radius: var(--rayon);
+}
+
+pre {
+  background: var(--fond);
+  border: 1px solid var(--bord);
+  border-radius: var(--rayon);
+  padding: var(--espace-2);
+  overflow-x: auto;
+  font-size: var(--t-petit);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.erreur {
+  color: var(--rupture);
+}
