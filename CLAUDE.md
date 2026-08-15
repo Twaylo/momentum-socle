@@ -17,12 +17,16 @@ Tu réponds et tu écris l'interface en **français**.
 Un chantier = une session = un déploiement. On ne commence pas le suivant tant
 que le précédent n'est pas vérifié par le fondateur sur ses vrais comptes.
 
-1. **Connexion.** OAuth sur les quatre comptes (YouTube, Instagram, Facebook,
-   TikTok) en mode développement. Un écran Réglages qui montre, pour chaque
-   réseau : connecté ou non, date d'expiration du jeton, dernière erreur reçue.
+1. **Connexion YouTube.** OAuth sur le seul compte YouTube, en mode
+   développement. Un écran Réglages qui montre : connecté ou non, date
+   d'expiration du jeton, dernière erreur reçue. Plus un verrou d'accès à
+   l'entrée de l'application — un mot de passe unique en variable
+   d'environnement, le plus simple qui tienne. Un seul chemin OAuth à faire
+   marcher avant d'en dupliquer trois.
 2. **Publier sur YouTube.** Une vidéo part de l'application et arrive sur la
    vraie chaîne.
-3. **Publier sur les trois autres**, un réseau à la fois.
+3. **Connecter puis publier sur les trois autres** (Instagram, Facebook,
+   TikTok) — un réseau par session, jamais deux.
 4. **Lire les statistiques d'un seul réseau**, avec une fenêtre honnête.
 5. **Lire les trois autres**, un à la fois.
 6. **Écran d'ensemble.** Audience globale et répartition par réseau.
@@ -71,8 +75,15 @@ Pièges de plateforme déjà rencontrés, à traiter comme acquis :
 ## Stack et commandes
 
 - Framework : Next.js — Hébergement : Render
-- Base de données : `[À REMPLIR]`
-- Gestionnaire de paquets : `[À REMPLIR]`
+- Base de données : **PostgreSQL dès maintenant**, jamais SQLite. Sur Render le
+  disque est effacé à chaque redéploiement : des jetons stockés en local
+  seraient perdus, et il faudrait reconnecter les réseaux à chaque mise en
+  ligne.
+- `CLE_CHIFFREMENT` : générée une seule fois, conservée dans le gestionnaire de
+  mots de passe du fondateur, **identique partout** — local et production. Une
+  clé qui change oblige à tout reconnecter.
+- Gestionnaire de paquets : `[À REMPLIR]` — celui de l'ancien dépôt, à relever
+  à sa réception.
 
 ```
 [À REMPLIR] dev      # lancer en local
@@ -128,6 +139,10 @@ session neuve. L'état se transmet par un fichier du dépôt, jamais par la mém
 de la conversation. Quand le contexte approche du compactage, tu t'arrêtes et tu
 écris l'état — tu ne continues pas à modifier des fichiers que tu ne peux plus
 relire entièrement.
+
+**Fin de chantier = `ETAT.md`.** À la racine, réécrit à la fin de chaque
+chantier : ce qui est fait, ce qui reste, les pièges rencontrés. C'est ce
+fichier que lit la session suivante — elle ne lit pas la conversation.
 
 **La donnée avant l'écran.** Aucun bloc d'interface construit tant qu'un chiffre
 réel n'y est pas passé.
